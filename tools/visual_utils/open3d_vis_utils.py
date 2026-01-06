@@ -3,16 +3,25 @@ Open3d visualization tool box
 Written by Jihan YANG
 All rights preserved from 2021 - present.
 """
+import matplotlib
+import matplotlib.colors
+import numpy as np
 import open3d
 import torch
-import matplotlib
-import numpy as np
 
-box_colormap = [
-    [1, 1, 1],
-    [0, 1, 0],
-    [0, 1, 1],
-    [1, 1, 0],
+box_colormap: list[list[float]] = [
+    [1, 0, 0], #red - car
+    [0, 1, 0], #green - truck
+    [0, 0, 1], #blue - construction_vehicle
+    [1, 1, 0], #yellow - bus
+    [1, 0, 1], #magenta - trailer
+    [0, 1, 1], #cyan - barrier
+    [1, 0.5, 0], #orange - motorcycle
+    [0.5, 0, 1], #violet - bicycle
+    [0.5, 0.5, 0.5], #grey - pedestrian
+    [0.5, 0.5, 0], #olive - traffic_cone
+    [0, 0.5, 0.5], # dark teal - unused
+    [1, 1, 1] #white - unused
 ]
 
 
@@ -35,7 +44,7 @@ def get_coor_colors(obj_labels):
     return label_rgba
 
 
-def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scores=None, point_colors=None, draw_origin=True):
+def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scores=None, point_colors=None, draw_origin=True, class_names=None):
     if isinstance(points, torch.Tensor):
         points = points.cpu().numpy()
     if isinstance(gt_boxes, torch.Tensor):
@@ -67,7 +76,7 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
         vis = draw_box(vis, gt_boxes, (0, 0, 1))
 
     if ref_boxes is not None:
-        vis = draw_box(vis, ref_boxes, (0, 1, 0), ref_labels, ref_scores)
+        vis = draw_box(vis, ref_boxes, (0, 1, 0), ref_labels, ref_scores, class_names=class_names)
 
     vis.run()
     vis.destroy_window()
@@ -100,17 +109,40 @@ def translate_boxes_to_open3d_instance(gt_boxes):
     return line_set, box3d
 
 
-def draw_box(vis, gt_boxes, color=(0, 1, 0), ref_labels=None, score=None):
+def draw_box(vis, gt_boxes, color=(0, 1, 0), ref_labels=None, score=None, class_names=None):
+    has_labels = hasattr(vis, 'add_3d_label')
+    if score is not None and not has_labels:
+        # Using a static variable to ensure the message is printed only once per session
+        if not getattr(draw_box, 'has_warned_about_labels', False):
+            print("\nWarning: Your Open3D version does not support 3D labels. Scores and class names will not be displayed in the visualizer.\n")
+            draw_box.has_warned_about_labels = True
+
     for i in range(gt_boxes.shape[0]):
-        line_set, box3d = translate_boxes_to_open3d_instance(gt_boxes[i])
-        if ref_labels is None:
-            line_set.paint_uniform_color(color)
-        else:
-            line_set.paint_uniform_color(box_colormap[ref_labels[i]])
+        scr = None
+        if score is not None:
+            scr = float(score[i].item()) if isinstance(score[i], torch.Tensor) else float(score[i])
+        
+        if scr is None or scr > 0.1:
+            line_set, box3d = translate_boxes_to_open3d_instance(gt_boxes[i])
+            text = f'{scr:.2f}'
 
-        vis.add_geometry(line_set)
+            if ref_labels is None:
+                line_set.paint_uniform_color(color)
+            else:
+                label_idx = int(ref_labels[i].item()) if isinstance(ref_labels[i], torch.Tensor) else int(ref_labels[i])
+                line_set.paint_uniform_color(box_colormap[label_idx - 1])
+                if class_names is not None:
+                    if 0 <= (label_idx - 1) < len(class_names):
+                        cls_name = class_names[label_idx - 1]
+                        text = f'{cls_name}: {scr:.2f}, {box_colormap[label_idx - 1]}, {label_idx}'
 
-        # if score is not None:
-        #     corners = box3d.get_box_points()
-        #     vis.add_3d_label(corners[5], '%.2f' % score[i])
+            vis.add_geometry(line_set)
+
+            corners = box3d.get_box_points()
+            
+            print(text)
+            # 4. Add the label at corner 5 (top-front-right usually)
+            if has_labels:
+                vis.add_3d_label(corners[5], text)
+            
     return vis

@@ -5,6 +5,7 @@
 data/
 *.pyc
 venv/
+.venv/
 *.idea/
 *.so
 *.yaml
@@ -15,3 +16,5 @@ venv/
 *.bin
 output
 version.py
+*.log
+.vscode

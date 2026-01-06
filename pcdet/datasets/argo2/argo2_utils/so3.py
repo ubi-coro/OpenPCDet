@@ -6,19 +6,19 @@ from torch import Tensor
 from math import pi as PI
 
 
-@torch.jit.script
-def quat_to_mat(quat_wxyz: Tensor) -> Tensor:
-    """Convert scalar first quaternion to rotation matrix.
+#@torch.jit.script
+#def quat_to_mat(quat_wxyz: Tensor) -> Tensor:
+#    """Convert scalar first quaternion to rotation matrix.
 
-    Args:
-        quat_wxyz: (...,4) Scalar first quaternions.
+#    Args:
+#        quat_wxyz: (...,4) Scalar first quaternions.
 
-    Returns:
-        (...,3,3) 3D rotation matrices.
-    """
-    return C.quaternion_to_rotation_matrix(
-        quat_wxyz, order=C.QuaternionCoeffOrder.WXYZ
-    )
+#    Returns:
+#        (...,3,3) 3D rotation matrices.
+#    """
+#    return C.quaternion_to_rotation_matrix(
+#        quat_wxyz, order=C.QuaternionCoeffOrder.WXYZ
+#    )
 
 
 # @torch.jit.script
